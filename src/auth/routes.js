@@ -1,5 +1,7 @@
 import express from 'express';
 import { registerUser, verifyEmail, resendVerificationEmail } from './registration.js';
+import * as authService from '../services/authService.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -104,6 +106,127 @@ router.post('/resend-verification', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'An unexpected error occurred. Please try again later.',
+    });
+  }
+});
+
+/**
+ * POST /auth/login
+ * Login with email and password
+ */
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Email and password are required.',
+      });
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'Please provide a valid email address.',
+      });
+    }
+
+    // Get client IP for rate limiting
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+
+    const result = await authService.login(email, password, ip);
+
+    if (!result.success) {
+      const statusCode = result.error === 'rate_limited' ? 429 : 401;
+      return res.status(statusCode).json({
+        error: result.error,
+        message: result.message,
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Login successful.',
+      user: result.user,
+      token: result.session.token,
+      expiresAt: result.session.expiresAt,
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred during login. Please try again.',
+    });
+  }
+});
+
+/**
+ * POST /auth/logout
+ * Logout current session
+ */
+router.post('/logout', authenticate, async (req, res) => {
+  try {
+    const result = await authService.logout(req.sessionToken);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: 'logout_failed',
+        message: 'Unable to logout. Session may already be invalid.',
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Logged out successfully.',
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred during logout. Please try again.',
+    });
+  }
+});
+
+/**
+ * POST /auth/logout-all
+ * Logout all sessions for the current user
+ */
+router.post('/logout-all', authenticate, async (req, res) => {
+  try {
+    const result = await authService.logoutAll(req.user.id);
+
+    return res.status(200).json({
+      message: `Successfully logged out of ${result.count} session(s).`,
+    });
+  } catch (error) {
+    console.error('Logout all error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred during logout. Please try again.',
+    });
+  }
+});
+
+/**
+ * GET /auth/session
+ * Get current session information
+ */
+router.get('/session', authenticate, async (req, res) => {
+  try {
+    const session = await authService.validateSession(req.sessionToken);
+
+    return res.status(200).json({
+      user: session.user,
+      expiresAt: session.expiresAt,
+    });
+  } catch (error) {
+    console.error('Session check error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred while checking session.',
     });
   }
 });

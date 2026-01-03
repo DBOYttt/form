@@ -1,7 +1,7 @@
 {
   "name": "auth-service",
   "version": "1.0.0",
-  "description": "User authentication service with email verification",
+  "description": "User authentication service with email verification and login/logout",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -10,14 +10,17 @@
     "test": "node --test src/**/*.test.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
     "bcrypt": "^5.1.1",
-    "pg": "^8.11.3",
-    "uuid": "^9.0.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
     "nodemailer": "^6.9.7",
-    "express-validator": "^7.0.1"
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

@@ -31,4 +31,17 @@ export const config = {
   // Security
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
   verificationTokenExpiry: parseInt(process.env.VERIFICATION_TOKEN_EXPIRY_HOURS || '24', 10),
+
+  // Session settings
+  session: {
+    tokenLength: 64,
+    expiresInMs: 24 * 60 * 60 * 1000, // 24 hours
+  },
+
+  // Rate limiting for login attempts
+  rateLimit: {
+    maxAttempts: 5,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    lockoutDurationMs: 30 * 60 * 1000, // 30 minutes lockout
+  },
 };
