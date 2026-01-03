@@ -7,7 +7,7 @@ import passwordResetRoutes from './routes/passwordReset.js';
 import protectedRoutes from './routes/protected.js';
 import { cors } from './middleware/cors.js';
 import pool from './db.js';
-import { startSessionCleanup } from './services/sessionService.js';
+import { startSessionCleanup, cleanupExpiredSessions } from './services/sessionService.js';
 import passwordResetService from './services/passwordResetService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,6 +20,29 @@ app.disable('x-powered-by');
 
 // CORS middleware - must be before other middleware
 app.use(cors());
+
+// Schedule cleanup jobs (every hour)
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+let cleanupInterval = null;
+
+function startCleanupJobs() {
+  cleanupInterval = setInterval(async () => {
+    try {
+      const sessionResult = await cleanupExpiredSessions();
+      const tokenResult = await passwordResetService.cleanupExpiredTokens();
+      if (config.nodeEnv === 'development') {
+        console.log(`Cleanup: ${sessionResult.deleted} sessions, ${tokenResult} tokens removed`);
+      }
+    } catch (error) {
+      console.error('Cleanup job error:', error);
+    }
+  }, CLEANUP_INTERVAL_MS);
+  
+  // Don't prevent process from exiting
+  if (cleanupInterval.unref) {
+    cleanupInterval.unref();
+  }
+}
 
 // Body parsing with size limits
 app.use(express.json({ limit: '10kb' }));
@@ -68,7 +91,7 @@ app.use((req, res) => {
 });
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({
     error: 'server_error',
@@ -79,6 +102,7 @@ app.use((err, req, res, next) => {
 // Graceful shutdown
 let server;
 if (import.meta.url === `file://${process.argv[1]}`) {
+  startCleanupJobs();
   server = app.listen(config.port, () => {
     console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
     

@@ -3,12 +3,53 @@ import { config } from '../config.js';
 // In-memory store for login attempts (use Redis in production)
 const loginAttempts = new Map();
 
+// Cleanup interval (run every 5 minutes)
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
 /**
  * Get the key for tracking login attempts
  */
 function getAttemptKey(email, ip) {
   return `${email}:${ip}`;
 }
+
+/**
+ * Clean up expired rate limit entries to prevent memory leak
+ */
+function cleanupExpiredEntries() {
+  const now = Date.now();
+  for (const [key, attempts] of loginAttempts.entries()) {
+    // Remove if window has passed and not locked, or lockout has expired
+    const windowExpired = now - attempts.firstAttempt > config.rateLimit.windowMs;
+    const lockoutExpired = !attempts.lockedUntil || now > attempts.lockedUntil;
+    
+    if (windowExpired && lockoutExpired) {
+      loginAttempts.delete(key);
+    }
+  }
+}
+
+// Start periodic cleanup
+let cleanupInterval = null;
+export function startCleanupInterval() {
+  if (!cleanupInterval) {
+    cleanupInterval = setInterval(cleanupExpiredEntries, CLEANUP_INTERVAL_MS);
+    // Don't prevent process from exiting
+    if (cleanupInterval.unref) {
+      cleanupInterval.unref();
+    }
+  }
+}
+
+export function stopCleanupInterval() {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+}
+
+// Auto-start cleanup on module load
+startCleanupInterval();
 
 /**
  * Record a failed login attempt

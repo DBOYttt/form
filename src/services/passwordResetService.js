@@ -22,7 +22,7 @@ class PasswordResetService {
       // Find user by email
       const userResult = await query(
         'SELECT id, email FROM users WHERE email = $1',
-        [email.toLowerCase().trim()]
+        [email.toLowerCase().trim()],
       );
 
       if (userResult.rows.length === 0) {
@@ -35,7 +35,7 @@ class PasswordResetService {
       // Invalidate any existing unused reset tokens for this user
       await query(
         'UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE',
-        [user.id]
+        [user.id],
       );
 
       // Generate secure token
@@ -50,7 +50,7 @@ class PasswordResetService {
       await query(
         `INSERT INTO password_reset_tokens (user_id, token, expires_at, used)
          VALUES ($1, $2, $3, FALSE)`,
-        [user.id, hashedToken, expiresAt]
+        [user.id, hashedToken, expiresAt],
       );
 
       // Send email with plain token
@@ -81,7 +81,7 @@ class PasswordResetService {
          FROM password_reset_tokens prt
          JOIN users u ON u.id = prt.user_id
          WHERE prt.token = $1`,
-        [hashedToken]
+        [hashedToken],
       );
 
       if (result.rows.length === 0) {
@@ -149,20 +149,20 @@ class PasswordResetService {
       // Update user's password
       await client.query(
         'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-        [passwordHash, tokenValidation.userId]
+        [passwordHash, tokenValidation.userId],
       );
 
       // Mark token as used
       await client.query(
         'UPDATE password_reset_tokens SET used = TRUE WHERE token = $1',
-        [hashToken(token)]
+        [hashToken(token)],
       );
 
       // Invalidate all existing sessions for security
       if (config.passwordReset.invalidateSessionsOnPasswordReset) {
         await client.query(
           'DELETE FROM sessions WHERE user_id = $1',
-          [tokenValidation.userId]
+          [tokenValidation.userId],
         );
       }
 
@@ -188,7 +188,7 @@ class PasswordResetService {
   async cleanupExpiredTokens() {
     try {
       const result = await query(
-        'DELETE FROM password_reset_tokens WHERE expires_at < NOW() OR used = TRUE'
+        'DELETE FROM password_reset_tokens WHERE expires_at < NOW() OR used = TRUE',
       );
       return result.rowCount;
     } catch (error) {

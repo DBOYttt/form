@@ -23,7 +23,7 @@ export async function registerUser({ email, password, confirmPassword }) {
   // Check if email already exists
   const existingUser = await query(
     'SELECT id FROM users WHERE email = $1',
-    [normalizedEmail]
+    [normalizedEmail],
   );
   
   if (existingUser.rows.length > 0) {
@@ -48,7 +48,7 @@ export async function registerUser({ email, password, confirmPassword }) {
       `INSERT INTO users (email, password_hash, email_verified)
        VALUES ($1, $2, false)
        RETURNING id, email, email_verified, created_at`,
-      [normalizedEmail, passwordHash]
+      [normalizedEmail, passwordHash],
     );
     
     const user = userResult.rows[0];
@@ -57,7 +57,7 @@ export async function registerUser({ email, password, confirmPassword }) {
     await client.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at)
        VALUES ($1, $2, $3)`,
-      [user.id, verificationToken, tokenExpiration]
+      [user.id, verificationToken, tokenExpiration],
     );
     
     await client.query('COMMIT');
@@ -113,7 +113,7 @@ export async function verifyEmail(token) {
       `SELECT evt.id, evt.user_id, evt.token, u.email_verified
        FROM email_verification_tokens evt
        JOIN users u ON u.id = evt.user_id
-       WHERE evt.expires_at > NOW()`
+       WHERE evt.expires_at > NOW()`,
     );
     
     // Timing-safe comparison
@@ -143,13 +143,13 @@ export async function verifyEmail(token) {
     // Update user as verified
     await client.query(
       'UPDATE users SET email_verified = true WHERE id = $1',
-      [user_id]
+      [user_id],
     );
     
     // Delete used verification token
     await client.query(
       'DELETE FROM email_verification_tokens WHERE user_id = $1',
-      [user_id]
+      [user_id],
     );
     
     await client.query('COMMIT');
@@ -180,7 +180,7 @@ export async function resendVerificationEmail(email) {
   // Find user
   const userResult = await query(
     'SELECT id, email_verified FROM users WHERE email = $1',
-    [normalizedEmail]
+    [normalizedEmail],
   );
   
   if (userResult.rows.length === 0) {
@@ -202,7 +202,7 @@ export async function resendVerificationEmail(email) {
     // Delete existing tokens
     await client.query(
       'DELETE FROM email_verification_tokens WHERE user_id = $1',
-      [user.id]
+      [user.id],
     );
     
     // Create new token
@@ -212,7 +212,7 @@ export async function resendVerificationEmail(email) {
     await client.query(
       `INSERT INTO email_verification_tokens (user_id, token, expires_at)
        VALUES ($1, $2, $3)`,
-      [user.id, verificationToken, tokenExpiration]
+      [user.id, verificationToken, tokenExpiration],
     );
     
     await client.query('COMMIT');

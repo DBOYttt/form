@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { query } from '../db.js';
 import { config } from '../config.js';
+import { generateToken, getSessionExpiry, hashToken } from '../utils/token.js';
 import * as rateLimiter from '../utils/rateLimiter.js';
 import * as sessionService from './sessionService.js';
 
@@ -10,7 +11,7 @@ import * as sessionService from './sessionService.js';
 async function validateCredentials(email, password) {
   const result = await query(
     'SELECT id, email, password_hash, email_verified FROM users WHERE email = $1',
-    [email.toLowerCase()]
+    [email.toLowerCase()],
   );
 
   if (result.rows.length === 0) {
@@ -39,6 +40,7 @@ async function validateCredentials(email, password) {
 
 /**
  * Create a new session for a user (with metadata support)
+ * Session tokens are hashed before storage for security
  */
 async function createSession(userId, metadata = {}) {
   return sessionService.createSimpleSession(userId, metadata);

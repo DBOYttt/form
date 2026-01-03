@@ -104,6 +104,6 @@ export function validateRegistrationInput({ email, password, confirmPassword }) 
   
   return {
     valid: errors.length === 0,
-    errors
+    errors,
   };
 }

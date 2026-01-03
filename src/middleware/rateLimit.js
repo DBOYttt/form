@@ -1,15 +1,13 @@
-/**
- * Rate Limiting Middleware
- * Provides configurable rate limiting for API endpoints
- */
-
 import { config } from '../config.js';
 
-// In-memory store for rate limiting (use Redis in production for multi-instance)
+// In-memory stores for different rate limit types
 const requestCounts = new Map();
 
+// Cleanup interval
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
 /**
- * Clean up expired entries periodically
+ * Clean up expired rate limit entries
  */
 function cleanupExpiredEntries() {
   const now = Date.now();
@@ -20,122 +18,77 @@ function cleanupExpiredEntries() {
   }
 }
 
-// Cleanup every 5 minutes
-setInterval(cleanupExpiredEntries, 5 * 60 * 1000);
+// Start periodic cleanup
+const cleanupInterval = setInterval(cleanupExpiredEntries, CLEANUP_INTERVAL_MS);
+if (cleanupInterval.unref) {
+  cleanupInterval.unref();
+}
 
 /**
- * Create rate limiting middleware
- * @param {Object} options - Rate limiting options
+ * Create a rate limiting middleware
+ * @param {Object} options - Rate limit options
  * @param {number} options.windowMs - Time window in milliseconds
  * @param {number} options.maxRequests - Maximum requests per window
+ * @param {string} options.keyGenerator - Function to generate key from request
  * @param {string} options.message - Error message when rate limited
- * @param {Function} options.keyGenerator - Function to generate rate limit key from request
- * @param {boolean} options.skipSuccessfulRequests - Don't count successful requests
- * @param {boolean} options.skipFailedRequests - Don't count failed requests
  */
-export function rateLimit(options = {}) {
-  const {
-    windowMs = config.rateLimit?.windowMs || 15 * 60 * 1000,
-    maxRequests = config.rateLimit?.maxAttempts || 100,
-    message = 'Too many requests, please try again later.',
-    keyGenerator = (req) => req.ip || req.socket?.remoteAddress || 'unknown',
-    skipSuccessfulRequests = false,
-    skipFailedRequests = false,
-  } = options;
-
+export function rateLimit({
+  windowMs = config.security?.rateLimitWindowMs || 900000,
+  maxRequests = config.security?.rateLimitMaxRequests || 100,
+  keyGenerator = (req) => req.ip || req.socket?.remoteAddress || 'unknown',
+  message = 'Too many requests. Please try again later.',
+} = {}) {
   return (req, res, next) => {
     const key = keyGenerator(req);
     const now = Date.now();
 
-    let record = requestCounts.get(key);
+    let data = requestCounts.get(key);
 
-    // Initialize or reset if window has passed
-    if (!record || now > record.windowStart + windowMs) {
-      record = {
-        count: 0,
-        windowStart: now,
-        windowMs,
-      };
+    // Reset if window has passed
+    if (!data || now > data.windowStart + data.windowMs) {
+      data = { count: 0, windowStart: now, windowMs };
     }
 
-    // Check if rate limited
-    if (record.count >= maxRequests) {
-      const retryAfter = Math.ceil((record.windowStart + windowMs - now) / 1000);
-      res.set('Retry-After', String(retryAfter));
+    data.count++;
+    requestCounts.set(key, data);
+
+    // Check if over limit
+    if (data.count > maxRequests) {
+      const retryAfter = Math.ceil((data.windowStart + windowMs - now) / 1000);
+      res.set('Retry-After', retryAfter);
       return res.status(429).json({
+        success: false,
         error: 'rate_limited',
         message,
         retryAfter,
       });
     }
 
-    // Increment count
-    record.count++;
-    requestCounts.set(key, record);
-
-    // Add headers
-    res.set('X-RateLimit-Limit', String(maxRequests));
-    res.set('X-RateLimit-Remaining', String(Math.max(0, maxRequests - record.count)));
-    res.set('X-RateLimit-Reset', String(Math.ceil((record.windowStart + windowMs) / 1000)));
-
-    // Handle skip options by hooking into response
-    if (skipSuccessfulRequests || skipFailedRequests) {
-      const originalEnd = res.end;
-      res.end = function(...args) {
-        if ((skipSuccessfulRequests && res.statusCode < 400) ||
-            (skipFailedRequests && res.statusCode >= 400)) {
-          record.count = Math.max(0, record.count - 1);
-          requestCounts.set(key, record);
-        }
-        return originalEnd.apply(this, args);
-      };
-    }
+    // Add rate limit headers
+    res.set('X-RateLimit-Limit', maxRequests);
+    res.set('X-RateLimit-Remaining', Math.max(0, maxRequests - data.count));
+    res.set('X-RateLimit-Reset', Math.ceil((data.windowStart + windowMs) / 1000));
 
     next();
   };
 }
 
 /**
- * Strict rate limiter for sensitive endpoints (login, registration, password reset)
+ * Strict rate limit for sensitive operations (registration, password reset)
+ * 5 requests per 15 minutes per IP
  */
-export function strictRateLimit() {
-  return rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 5,
-    message: 'Too many attempts. Please try again in 15 minutes.',
-    keyGenerator: (req) => {
-      // Rate limit by IP + endpoint
-      const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-      return `${ip}:${req.path}`;
-    },
-  });
-}
+export const strictRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
+  message: 'Too many attempts. Please try again in 15 minutes.',
+});
 
 /**
- * Rate limiter for authentication endpoints
+ * Standard rate limit for general API endpoints
+ * 100 requests per 15 minutes per IP
  */
-export function authRateLimit() {
-  return rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 10,
-    message: 'Too many authentication attempts. Please try again later.',
-    keyGenerator: (req) => {
-      const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-      const email = req.body?.email?.toLowerCase() || '';
-      return `auth:${ip}:${email}`;
-    },
-  });
-}
-
-/**
- * General API rate limiter
- */
-export function apiRateLimit() {
-  return rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    maxRequests: 60,
-    message: 'Too many requests. Please slow down.',
-  });
-}
-
-export default rateLimit;
+export const standardRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 100,
+  message: 'Too many requests. Please try again later.',
+});
