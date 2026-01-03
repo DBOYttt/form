@@ -6,6 +6,7 @@ import authRoutes from './auth/routes.js';
 import passwordResetRoutes from './routes/passwordReset.js';
 import protectedRoutes from './routes/protected.js';
 import { cors } from './middleware/cors.js';
+import pool from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,8 +17,8 @@ const app = express();
 app.use(cors());
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Trust proxy for accurate IP detection (for rate limiting)
 app.set('trust proxy', 1);
@@ -70,11 +71,28 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Graceful shutdown handler
+function gracefulShutdown(signal) {
+  console.log(`Received ${signal}. Shutting down gracefully...`);
+  pool.end(() => {
+    console.log('Database pool closed.');
+    process.exit(0);
+  });
+  // Force exit after 10 seconds if graceful shutdown fails
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10000);
+}
+
 // Start server
 if (import.meta.url === `file://${process.argv[1]}`) {
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
   });
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 export default app;

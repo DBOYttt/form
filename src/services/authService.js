@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { query } from '../db.js';
+import { config } from '../config.js';
 import { generateToken, getSessionExpiry } from '../utils/token.js';
 import * as rateLimiter from '../utils/rateLimiter.js';
 
@@ -55,6 +56,11 @@ async function createSession(userId) {
  * Login a user
  */
 export async function login(email, password, ip) {
+  // Validate input
+  if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+    return { success: false, error: 'invalid_input', message: 'Email and password are required.' };
+  }
+
   // Check rate limiting
   const rateCheck = rateLimiter.isLoginAllowed(email, ip);
   if (!rateCheck.allowed) {
@@ -82,7 +88,7 @@ export async function login(email, password, ip) {
 
     // Generic message for security
     const attempts = rateLimiter.getAttemptCount(email, ip);
-    const remaining = 5 - attempts;
+    const remaining = config.rateLimit.maxAttempts - attempts;
     
     return {
       success: false,

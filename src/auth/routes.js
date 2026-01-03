@@ -2,6 +2,7 @@ import express from 'express';
 import { registerUser, verifyEmail, resendVerificationEmail } from './registration.js';
 import * as authService from '../services/authService.js';
 import { authenticate } from '../middleware/auth.js';
+import { validateEmail } from '../utils/validation.js';
 
 const router = express.Router();
 
@@ -126,12 +127,12 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Email format validation using shared validator
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
       return res.status(400).json({
         error: 'validation_error',
-        message: 'Please provide a valid email address.',
+        message: emailValidation.error,
       });
     }
 

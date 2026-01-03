@@ -5,6 +5,11 @@ const { Pool } = pg;
 
 const pool = new Pool(config.database);
 
+// Handle pool errors to prevent crashes
+pool.on('error', (err) => {
+  console.error('Unexpected database pool error:', err);
+});
+
 export default pool;
 
 /**
