@@ -2,7 +2,7 @@
 -- Migration: 002_login_attempts.up.sql
 
 CREATE TABLE login_attempts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) NOT NULL,
     ip_address VARCHAR(45) NOT NULL,
     attempted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),

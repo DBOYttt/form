@@ -191,7 +191,7 @@ describe('Session Service - Metadata Tracking', () => {
     it('should store user agent', () => {
       const metadata = { 
         ip: null, 
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' 
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 
       };
       
       assert.ok(metadata.userAgent.includes('Mozilla'));

@@ -77,18 +77,34 @@ export function rateLimit({
  * Strict rate limit for sensitive operations (registration, password reset)
  * 5 requests per 15 minutes per IP
  */
-export const strictRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 5,
-  message: 'Too many attempts. Please try again in 15 minutes.',
-});
+export function strictRateLimit() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 5,
+    message: 'Too many attempts. Please try again in 15 minutes.',
+  });
+}
+
+/**
+ * Auth rate limit for login attempts
+ * 10 requests per 15 minutes per IP
+ */
+export function authRateLimit() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 10,
+    message: 'Too many login attempts. Please try again in 15 minutes.',
+  });
+}
 
 /**
  * Standard rate limit for general API endpoints
  * 100 requests per 15 minutes per IP
  */
-export const standardRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  maxRequests: 100,
-  message: 'Too many requests. Please try again later.',
-});
+export function standardRateLimit() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    maxRequests: 100,
+    message: 'Too many requests. Please try again later.',
+  });
+}

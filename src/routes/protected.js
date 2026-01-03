@@ -23,7 +23,7 @@ router.get('/me', async (req, res) => {
     const result = await query(
       `SELECT id, email, role, email_verified, created_at, updated_at 
        FROM users WHERE id = $1`,
-      [req.user.id]
+      [req.user.id],
     );
 
     if (result.rows.length === 0) {
@@ -77,7 +77,7 @@ router.put('/me', async (req, res) => {
       // Check if email is already taken
       const existingUser = await query(
         'SELECT id FROM users WHERE email = $1 AND id != $2',
-        [email.toLowerCase(), req.user.id]
+        [email.toLowerCase(), req.user.id],
       );
 
       if (existingUser.rows.length > 0) {
@@ -92,7 +92,7 @@ router.put('/me', async (req, res) => {
       paramIndex++;
 
       // Reset email verification when email changes
-      updates.push(`email_verified = false`);
+      updates.push('email_verified = false');
     }
 
     if (updates.length === 0) {
@@ -107,7 +107,7 @@ router.put('/me', async (req, res) => {
       `UPDATE users SET ${updates.join(', ')}, updated_at = NOW() 
        WHERE id = $${paramIndex} 
        RETURNING id, email, role, email_verified, created_at, updated_at`,
-      values
+      values,
     );
 
     const user = result.rows[0];
@@ -164,7 +164,7 @@ router.post('/me/change-password', async (req, res) => {
     // Verify current password
     const userResult = await query(
       'SELECT password_hash FROM users WHERE id = $1',
-      [req.user.id]
+      [req.user.id],
     );
 
     if (userResult.rows.length === 0) {
@@ -176,7 +176,7 @@ router.post('/me/change-password', async (req, res) => {
 
     const validPassword = await bcrypt.compare(
       currentPassword,
-      userResult.rows[0].password_hash
+      userResult.rows[0].password_hash,
     );
 
     if (!validPassword) {
@@ -190,14 +190,14 @@ router.post('/me/change-password', async (req, res) => {
     const passwordHash = await bcrypt.hash(newPassword, config.bcryptRounds);
     await query(
       'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-      [passwordHash, req.user.id]
+      [passwordHash, req.user.id],
     );
 
     // Optionally invalidate all other sessions
     if (config.passwordReset?.invalidateSessionsOnPasswordReset) {
       await query(
         'DELETE FROM sessions WHERE user_id = $1 AND token != $2',
-        [req.user.id, req.sessionToken]
+        [req.user.id, req.sessionToken],
       );
     }
 
@@ -225,7 +225,7 @@ router.get('/me/sessions', async (req, res) => {
        FROM sessions 
        WHERE user_id = $2 AND expires_at > NOW()
        ORDER BY created_at DESC`,
-      [req.sessionToken, req.user.id]
+      [req.sessionToken, req.user.id],
     );
 
     return res.status(200).json({
@@ -255,7 +255,7 @@ router.delete('/me/sessions/:sessionId', async (req, res) => {
 
     const result = await query(
       'DELETE FROM sessions WHERE id = $1 AND user_id = $2 RETURNING id',
-      [sessionId, req.user.id]
+      [sessionId, req.user.id],
     );
 
     if (result.rowCount === 0) {
@@ -295,7 +295,7 @@ router.delete('/me', async (req, res) => {
     // Verify password
     const userResult = await query(
       'SELECT password_hash FROM users WHERE id = $1',
-      [req.user.id]
+      [req.user.id],
     );
 
     if (userResult.rows.length === 0) {
@@ -307,7 +307,7 @@ router.delete('/me', async (req, res) => {
 
     const validPassword = await bcrypt.compare(
       password,
-      userResult.rows[0].password_hash
+      userResult.rows[0].password_hash,
     );
 
     if (!validPassword) {
@@ -351,7 +351,7 @@ router.get('/admin/users', requireRole('admin'), async (req, res) => {
          FROM users 
          ORDER BY created_at DESC 
          LIMIT $1 OFFSET $2`,
-        [parseInt(limit, 10), offset]
+        [parseInt(limit, 10), offset],
       ),
       query('SELECT COUNT(*) as total FROM users'),
     ]);
@@ -410,7 +410,7 @@ router.put('/admin/users/:userId/role', requireRole('admin'), async (req, res) =
       `UPDATE users SET role = $1, updated_at = NOW() 
        WHERE id = $2 
        RETURNING id, email, role`,
-      [role, userId]
+      [role, userId],
     );
 
     if (result.rowCount === 0) {
@@ -451,7 +451,7 @@ router.delete('/admin/users/:userId', requireRole('admin'), async (req, res) => 
 
     const result = await query(
       'DELETE FROM users WHERE id = $1 RETURNING id, email',
-      [userId]
+      [userId],
     );
 
     if (result.rowCount === 0) {

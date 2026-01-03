@@ -11,14 +11,9 @@ const pool = new Pool({
   statement_timeout: 30000,       // Timeout queries after 30 seconds
 });
 
-// Handle pool errors
-pool.on('error', (err) => {
-  console.error('Unexpected database pool error:', err.message);
-});
-
 // Handle pool errors to prevent crashes
 pool.on('error', (err) => {
-  console.error('Unexpected database pool error:', err);
+  console.error('Unexpected database pool error:', err.message);
 });
 
 export default pool;

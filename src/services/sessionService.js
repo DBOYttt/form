@@ -82,14 +82,14 @@ export async function createSession(userId, metadata = {}) {
   await query(
     `INSERT INTO sessions (user_id, token, expires_at, ip_address, user_agent, last_activity_at) 
      VALUES ($1, $2, $3, $4, $5, NOW())`,
-    [userId, accessTokenHash, expiresAt, ip || null, userAgent || null]
+    [userId, accessTokenHash, expiresAt, ip || null, userAgent || null],
   );
 
   // Store refresh token mapping (we'll use the session token field for the primary token)
   // and store refresh token hash in a way that links to the session
   await query(
-    `UPDATE sessions SET token = $1 WHERE user_id = $2 AND token = $3`,
-    [JSON.stringify({ access: accessTokenHash, refresh: refreshTokenHash }), userId, accessTokenHash]
+    'UPDATE sessions SET token = $1 WHERE user_id = $2 AND token = $3',
+    [JSON.stringify({ access: accessTokenHash, refresh: refreshTokenHash }), userId, accessTokenHash],
   );
 
   return {
@@ -121,7 +121,7 @@ export async function createSimpleSession(userId, metadata = {}) {
   await query(
     `INSERT INTO sessions (user_id, token, expires_at, ip_address, user_agent, last_activity_at) 
      VALUES ($1, $2, $3, $4, $5, NOW())`,
-    [userId, tokenHash, expiresAt, ip || null, userAgent || null]
+    [userId, tokenHash, expiresAt, ip || null, userAgent || null],
   );
 
   return { token, expiresAt };
@@ -139,7 +139,7 @@ export async function validateSession(token) {
      FROM sessions s 
      JOIN users u ON s.user_id = u.id 
      WHERE s.token = $1 AND s.expires_at > NOW() AND (s.is_revoked = FALSE OR s.is_revoked IS NULL)`,
-    [tokenHash]
+    [tokenHash],
   );
 
   if (result.rows.length === 0) {
@@ -150,7 +150,7 @@ export async function validateSession(token) {
        FROM sessions s 
        JOIN users u ON s.user_id = u.id 
        WHERE s.token = $1 AND s.expires_at > NOW() AND (s.is_revoked = FALSE OR s.is_revoked IS NULL)`,
-      [token]
+      [token],
     );
     
     if (legacyResult.rows.length === 0) {
@@ -207,7 +207,7 @@ export async function refreshSession(token) {
      SET expires_at = $1, last_activity_at = NOW() 
      WHERE token = $2 AND expires_at > NOW() AND (is_revoked = FALSE OR is_revoked IS NULL)
      RETURNING id, user_id, expires_at`,
-    [newExpiresAt, tokenHash]
+    [newExpiresAt, tokenHash],
   );
 
   // Fallback to unhashed token
@@ -217,7 +217,7 @@ export async function refreshSession(token) {
        SET expires_at = $1, last_activity_at = NOW() 
        WHERE token = $2 AND expires_at > NOW() AND (is_revoked = FALSE OR is_revoked IS NULL)
        RETURNING id, user_id, expires_at`,
-      [newExpiresAt, token]
+      [newExpiresAt, token],
     );
   }
 
@@ -246,7 +246,7 @@ export async function rotateSessionToken(oldToken) {
      SET token = $1, expires_at = $2, last_activity_at = NOW() 
      WHERE token = $3 AND expires_at > NOW() AND (is_revoked = FALSE OR is_revoked IS NULL)
      RETURNING id, user_id, expires_at`,
-    [newTokenHash, newExpiresAt, oldTokenHash]
+    [newTokenHash, newExpiresAt, oldTokenHash],
   );
 
   // Fallback to unhashed token
@@ -256,7 +256,7 @@ export async function rotateSessionToken(oldToken) {
        SET token = $1, expires_at = $2, last_activity_at = NOW() 
        WHERE token = $3 AND expires_at > NOW() AND (is_revoked = FALSE OR is_revoked IS NULL)
        RETURNING id, user_id, expires_at`,
-      [newTokenHash, newExpiresAt, oldToken]
+      [newTokenHash, newExpiresAt, oldToken],
     );
   }
 
@@ -276,8 +276,8 @@ export async function rotateSessionToken(oldToken) {
  */
 async function updateLastActivity(sessionId) {
   await query(
-    `UPDATE sessions SET last_activity_at = NOW() WHERE id = $1`,
-    [sessionId]
+    'UPDATE sessions SET last_activity_at = NOW() WHERE id = $1',
+    [sessionId],
   );
 }
 
@@ -288,7 +288,7 @@ async function getActiveSessionCount(userId) {
   const result = await query(
     `SELECT COUNT(*) as count FROM sessions 
      WHERE user_id = $1 AND expires_at > NOW() AND (is_revoked = FALSE OR is_revoked IS NULL)`,
-    [userId]
+    [userId],
   );
   return parseInt(result.rows[0].count, 10);
 }
@@ -305,7 +305,7 @@ async function revokeOldestSession(userId) {
        ORDER BY created_at ASC 
        LIMIT 1
      )`,
-    [userId]
+    [userId],
   );
 }
 
@@ -318,7 +318,7 @@ export async function getActiveSessions(userId) {
      FROM sessions 
      WHERE user_id = $1 AND expires_at > NOW() AND (is_revoked = FALSE OR is_revoked IS NULL)
      ORDER BY last_activity_at DESC`,
-    [userId]
+    [userId],
   );
 
   return result.rows.map(session => ({
@@ -339,7 +339,7 @@ export async function revokeSession(sessionId, userId) {
     `UPDATE sessions SET is_revoked = TRUE 
      WHERE id = $1 AND user_id = $2 AND (is_revoked = FALSE OR is_revoked IS NULL)
      RETURNING id`,
-    [sessionId, userId]
+    [sessionId, userId],
   );
 
   return { success: result.rowCount > 0 };
@@ -353,15 +353,15 @@ export async function revokeSessionByToken(token) {
   
   // Try hashed token first
   let result = await query(
-    `UPDATE sessions SET is_revoked = TRUE WHERE token = $1 RETURNING id`,
-    [tokenHash]
+    'UPDATE sessions SET is_revoked = TRUE WHERE token = $1 RETURNING id',
+    [tokenHash],
   );
 
   // Fallback to unhashed
   if (result.rowCount === 0) {
     result = await query(
-      `UPDATE sessions SET is_revoked = TRUE WHERE token = $1 RETURNING id`,
-      [token]
+      'UPDATE sessions SET is_revoked = TRUE WHERE token = $1 RETURNING id',
+      [token],
     );
   }
 
@@ -393,7 +393,7 @@ export async function revokeAllSessions(userId, exceptSessionId = null) {
  */
 export async function cleanupExpiredSessions() {
   const result = await query(
-    `DELETE FROM sessions WHERE expires_at < NOW() OR is_revoked = TRUE`
+    'DELETE FROM sessions WHERE expires_at < NOW() OR is_revoked = TRUE',
   );
   return { deleted: result.rowCount };
 }
