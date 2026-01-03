@@ -10,8 +10,9 @@ A Node.js authentication service implementing secure user registration with emai
 - Password strength requirements (8+ chars, uppercase, lowercase, number)
 - Password hashing with bcrypt (12 rounds)
 - Email uniqueness validation
-- Cryptographically secure verification tokens
 - Email verification flow with expiring tokens
+- Password reset via email
+- Session-based authentication
 - Resend verification email functionality
 
 ### Password Reset
@@ -22,6 +23,50 @@ A Node.js authentication service implementing secure user registration with emai
 - Token validation (exists, not expired, not used)
 - Session invalidation on password reset
 - Email enumeration protection
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18 or higher
+- PostgreSQL database
+- SMTP server (for email features)
+
+### Installation
+
+1. **Clone and setup:**
+   ```bash
+   ./setup.sh
+   ```
+
+2. **Configure environment:**
+   
+   Edit `.env` with your settings:
+   ```bash
+   # Database
+   DATABASE_URL=postgresql://user:password@localhost:5432/auth_db
+   
+   # Session (generate a secure random string)
+   SESSION_SECRET=your-secure-secret-at-least-32-characters
+   
+   # SMTP for emails
+   SMTP_HOST=smtp.example.com
+   SMTP_PORT=587
+   SMTP_USER=your-username
+   SMTP_PASS=your-password
+   ```
+
+3. **Create database and run migrations:**
+   ```bash
+   createdb auth_db
+   npm run migrate
+   ```
+
+4. **Start the server:**
+   ```bash
+   ./start.sh        # Development
+   ./start-prod.sh   # Production
+   ```
 
 ## API Endpoints
 
@@ -127,53 +172,92 @@ Reset password using a valid token.
 - `/forgot-password` - Forgot password form
 - `/reset-password?token=xxx` - Reset password form
 
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start the production server |
+| `npm run dev` | Start development server with auto-reload |
+| `npm run setup` | Install dependencies and run migrations |
+| `npm run migrate` | Run pending database migrations |
+| `npm run migrate:down` | Rollback last migration |
+| `npm run migrate:status` | Show migration status |
+| `npm test` | Run tests |
+| `npm run lint` | Run ESLint |
+
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| PORT | 3000 | Server port |
-| NODE_ENV | development | Environment mode |
-| DB_HOST | localhost | PostgreSQL host |
-| DB_PORT | 5432 | PostgreSQL port |
-| DB_NAME | auth_db | Database name |
-| DB_USER | postgres | Database user |
-| DB_PASSWORD | postgres | Database password |
-| SMTP_HOST | localhost | SMTP server host |
-| SMTP_PORT | 587 | SMTP server port |
-| SMTP_SECURE | false | Use TLS |
-| SMTP_USER | - | SMTP username |
-| SMTP_PASSWORD | - | SMTP password |
-| EMAIL_FROM | noreply@example.com | Sender email |
-| BASE_URL | http://localhost:3000 | Application base URL |
-| BCRYPT_ROUNDS | 12 | Password hashing cost |
-| VERIFICATION_TOKEN_EXPIRY_HOURS | 24 | Email verification token expiry |
+### Required
 
-## Setup
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SESSION_SECRET` | Secret for session encryption (min 32 chars) |
 
-1. Run database migrations:
-   ```bash
-   psql -d auth_db -f migrations/001_create_auth_tables.up.sql
-   ```
+### Email (SMTP)
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SMTP_HOST` | SMTP server hostname | - |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USER` | SMTP username | - |
+| `SMTP_PASS` | SMTP password | - |
+| `SMTP_FROM` | From email address | `noreply@example.com` |
+| `SMTP_SECURE` | Use TLS | `false` |
 
-3. Configure environment variables (see above)
+### Application
 
-4. Start the server:
-   ```bash
-   npm start
-   # or for development with auto-reload:
-   npm run dev
-   ```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NODE_ENV` | Environment (`development`, `production`, `test`) | `development` |
+| `PORT` | Server port | `3000` |
+| `APP_URL` | Public URL for email links | `http://localhost:3000` |
+| `APP_NAME` | Application name | `Authentication System` |
 
-## Testing
+### Token Expiry (seconds)
 
-```bash
-npm test
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SESSION_EXPIRY` | Session lifetime | `86400` (24h) |
+| `PASSWORD_RESET_EXPIRY` | Password reset token lifetime | `3600` (1h) |
+| `EMAIL_VERIFICATION_EXPIRY` | Email verification token lifetime | `86400` (24h) |
+
+### Security
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BCRYPT_ROUNDS` | Bcrypt hash rounds | `12` |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit window | `900000` (15min) |
+| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `100` |
+
+## Project Structure
+
 ```
+.
+├── config.js           # Configuration loader
+├── package.json        # Dependencies and scripts
+├── .env.example        # Example environment variables
+├── start.sh            # Development start script (Unix)
+├── start.bat           # Development start script (Windows)
+├── start-prod.sh       # Production start script
+├── setup.sh            # Initial setup script
+├── migrations/         # Database migrations
+│   ├── 001_auth_schema.sql
+│   └── ...
+├── scripts/            # Utility scripts
+│   └── migrate.js      # Migration runner
+└── src/                # Application source
+    └── index.js        # Entry point
+```
+
+## Database Schema
+
+The authentication system uses the following tables:
+
+- **users** - User accounts with email and password hash
+- **sessions** - Active user sessions
+- **password_reset_tokens** - Password reset tokens
+- **email_verification_tokens** - Email verification tokens
 
 ## Security Considerations
 
@@ -186,3 +270,9 @@ npm test
 - All sessions invalidated on password reset
 - Email normalization (lowercase, trimmed)
 - Generic responses to prevent email enumeration
+- Use HTTPS in production
+- Rate limiting to prevent brute force attacks
+
+## License
+
+MIT
