@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import { timingSafeEqual } from 'crypto';
 import { query, getClient } from '../db.js';
 import { config } from '../config.js';
 import { generateToken, getTokenExpiration } from '../utils/token.js';
@@ -107,21 +108,32 @@ export async function verifyEmail(token) {
   try {
     await client.query('BEGIN');
     
-    // Find valid token
+    // Find all non-expired tokens and compare in constant time
     const tokenResult = await client.query(
-      `SELECT evt.id, evt.user_id, u.email_verified
+      `SELECT evt.id, evt.user_id, evt.token, u.email_verified
        FROM email_verification_tokens evt
        JOIN users u ON u.id = evt.user_id
-       WHERE evt.token = $1 AND evt.expires_at > NOW()`,
-      [token]
+       WHERE evt.expires_at > NOW()`
     );
     
-    if (tokenResult.rows.length === 0) {
+    // Timing-safe comparison
+    let matchedToken = null;
+    const tokenBuffer = Buffer.from(token);
+    for (const row of tokenResult.rows) {
+      const storedBuffer = Buffer.from(row.token);
+      if (tokenBuffer.length === storedBuffer.length && 
+          timingSafeEqual(tokenBuffer, storedBuffer)) {
+        matchedToken = row;
+        break;
+      }
+    }
+    
+    if (!matchedToken) {
       await client.query('ROLLBACK');
       return { success: false, error: 'Invalid or expired verification token' };
     }
     
-    const { user_id, email_verified } = tokenResult.rows[0];
+    const { user_id, email_verified } = matchedToken;
     
     if (email_verified) {
       await client.query('ROLLBACK');

@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import authRoutes from './auth/routes.js';
 import passwordResetRoutes from './routes/passwordReset.js';
@@ -20,6 +21,15 @@ app.use(cors());
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// Rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per window for auth endpoints
+  message: { success: false, error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Trust proxy for accurate IP detection (for rate limiting)
 app.set('trust proxy', 1);
 
@@ -36,8 +46,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth routes (registration, email verification, login, logout)
-app.use('/auth', authRoutes);
+// Auth routes (rate limited)
+app.use('/auth', authLimiter, authRoutes);
 
 // Password reset API routes
 app.use('/api/auth', passwordResetRoutes);
@@ -71,28 +81,27 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Graceful shutdown handler
-function gracefulShutdown(signal) {
-  console.log(`Received ${signal}. Shutting down gracefully...`);
-  pool.end(() => {
-    console.log('Database pool closed.');
-    process.exit(0);
-  });
-  // Force exit after 10 seconds if graceful shutdown fails
-  setTimeout(() => {
-    console.error('Forced shutdown after timeout.');
-    process.exit(1);
-  }, 10000);
-}
-
-// Start server
+// Graceful shutdown
+let server;
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const server = app.listen(config.port, () => {
+  server = app.listen(config.port, () => {
     console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
   });
-
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
+
+const shutdown = async (signal) => {
+  console.log(`${signal} received, shutting down gracefully`);
+  if (server) {
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+  }
+  await pool.end();
+  console.log('Database pool closed');
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default app;
