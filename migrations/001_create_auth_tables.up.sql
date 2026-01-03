@@ -1,14 +1,12 @@
 -- Authentication Database Schema
 -- Migration: 001_create_auth_tables
-
--- Enable UUID extension if not already enabled (PostgreSQL)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Requires: PostgreSQL 13+ (uses gen_random_uuid())
 
 -- ============================================
 -- Users Table
 -- ============================================
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
@@ -23,7 +21,7 @@ CREATE INDEX idx_users_email ON users(email);
 -- Sessions Table
 -- ============================================
 CREATE TABLE sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) NOT NULL UNIQUE,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -41,7 +39,7 @@ CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
 -- Password Reset Tokens Table
 -- ============================================
 CREATE TABLE password_reset_tokens (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) NOT NULL UNIQUE,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -53,12 +51,14 @@ CREATE TABLE password_reset_tokens (
 CREATE INDEX idx_password_reset_tokens_token ON password_reset_tokens(token);
 -- Index on user_id for user token lookups
 CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+-- Partial index for valid (unused) tokens
+CREATE INDEX idx_password_reset_tokens_valid ON password_reset_tokens(user_id, expires_at) WHERE used = FALSE;
 
 -- ============================================
 -- Email Verification Tokens Table
 -- ============================================
 CREATE TABLE email_verification_tokens (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) NOT NULL UNIQUE,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -79,7 +79,7 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
