@@ -136,10 +136,11 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Get client IP for rate limiting
+    // Get client IP and user agent for session metadata
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || null;
 
-    const result = await authService.login(email, password, ip);
+    const result = await authService.login(email, password, ip, userAgent);
 
     if (!result.success) {
       const statusCode = result.error === 'rate_limited' ? 429 : 401;
@@ -222,12 +223,120 @@ router.get('/session', authenticate, async (req, res) => {
     return res.status(200).json({
       user: session.user,
       expiresAt: session.expiresAt,
+      metadata: session.metadata,
     });
   } catch (error) {
     console.error('Session check error:', error);
     return res.status(500).json({
       error: 'server_error',
       message: 'An error occurred while checking session.',
+    });
+  }
+});
+
+/**
+ * GET /auth/sessions
+ * List all active sessions for the current user
+ */
+router.get('/sessions', authenticate, async (req, res) => {
+  try {
+    const sessions = await authService.getActiveSessions(req.user.id);
+
+    return res.status(200).json({
+      sessions,
+      count: sessions.length,
+    });
+  } catch (error) {
+    console.error('List sessions error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred while listing sessions.',
+    });
+  }
+});
+
+/**
+ * DELETE /auth/sessions/:sessionId
+ * Revoke a specific session
+ */
+router.delete('/sessions/:sessionId', authenticate, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const result = await authService.revokeSession(sessionId, req.user.id);
+
+    if (!result.success) {
+      return res.status(404).json({
+        error: 'session_not_found',
+        message: 'Session not found or already revoked.',
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Session revoked successfully.',
+    });
+  } catch (error) {
+    console.error('Revoke session error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred while revoking the session.',
+    });
+  }
+});
+
+/**
+ * POST /auth/session/refresh
+ * Refresh current session - extend expiration
+ */
+router.post('/session/refresh', authenticate, async (req, res) => {
+  try {
+    const result = await authService.refreshSession(req.sessionToken);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: 'refresh_failed',
+        message: 'Unable to refresh session.',
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Session refreshed successfully.',
+      expiresAt: result.expiresAt,
+    });
+  } catch (error) {
+    console.error('Session refresh error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred while refreshing the session.',
+    });
+  }
+});
+
+/**
+ * POST /auth/session/rotate
+ * Rotate session token - get a new token for the current session
+ */
+router.post('/session/rotate', authenticate, async (req, res) => {
+  try {
+    const result = await authService.rotateSessionToken(req.sessionToken);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: 'rotation_failed',
+        message: 'Unable to rotate session token.',
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Session token rotated successfully.',
+      token: result.token,
+      expiresAt: result.expiresAt,
+    });
+  } catch (error) {
+    console.error('Session rotation error:', error);
+    return res.status(500).json({
+      error: 'server_error',
+      message: 'An error occurred while rotating the session token.',
     });
   }
 });

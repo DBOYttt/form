@@ -35,7 +35,17 @@ export const config = {
   // Session settings
   session: {
     tokenLength: 64,
-    expiresInMs: 24 * 60 * 60 * 1000, // 24 hours
+    expiresInMs: parseInt(process.env.SESSION_EXPIRY_MS || '86400000', 10), // 24 hours default
+    tokenType: process.env.SESSION_TOKEN_TYPE || 'opaque', // 'jwt' or 'opaque'
+    maxConcurrent: parseInt(process.env.MAX_CONCURRENT_SESSIONS || '0', 10), // 0 = unlimited
+    cleanupIntervalMs: parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS || '3600000', 10), // 1 hour
+  },
+
+  // JWT settings (if using JWT tokens)
+  jwt: {
+    secret: process.env.JWT_SECRET || process.env.SESSION_SECRET || 'change-me-in-production',
+    accessTokenExpiryMs: parseInt(process.env.ACCESS_TOKEN_EXPIRY_MS || '900000', 10), // 15 minutes
+    refreshTokenExpiryMs: parseInt(process.env.REFRESH_TOKEN_EXPIRY_MS || '604800000', 10), // 7 days
   },
 
   // Rate limiting for login attempts

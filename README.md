@@ -15,6 +15,17 @@ A Node.js authentication service implementing secure user registration with emai
 - Session-based authentication
 - Resend verification email functionality
 
+### Session Management
+- Secure session tokens (opaque or JWT)
+- Session storage in database with user association
+- Configurable session expiration
+- Session refresh/renewal mechanism
+- Concurrent session limits (configurable)
+- List all active sessions
+- Revoke specific sessions
+- Automatic cleanup of expired sessions
+- Session metadata tracking (IP, user agent, last activity)
+
 ### Password Reset
 - Forgot password form with email input
 - Secure token generation with SHA-256 hashing
@@ -115,6 +126,131 @@ Resend verification email.
 }
 ```
 
+### POST /auth/login
+Login with email and password.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePass123"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "message": "Login successful.",
+  "user": { "id": "uuid", "email": "user@example.com" },
+  "token": "session-token",
+  "expiresAt": "2026-01-04T13:38:36.595Z"
+}
+```
+
+### POST /auth/logout
+Logout current session. Requires authentication.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Success Response (200):**
+```json
+{
+  "message": "Logged out successfully."
+}
+```
+
+### POST /auth/logout-all
+Logout all sessions for the current user.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Success Response (200):**
+```json
+{
+  "message": "Successfully logged out of 3 session(s)."
+}
+```
+
+### GET /auth/session
+Get current session information.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Success Response (200):**
+```json
+{
+  "user": { "id": "uuid", "email": "user@example.com" },
+  "expiresAt": "2026-01-04T13:38:36.595Z",
+  "metadata": {
+    "ip": "192.168.1.1",
+    "userAgent": "Mozilla/5.0...",
+    "lastActivity": "2026-01-03T14:00:00.000Z",
+    "createdAt": "2026-01-03T13:38:36.595Z"
+  }
+}
+```
+
+### GET /auth/sessions
+List all active sessions for the current user.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Success Response (200):**
+```json
+{
+  "sessions": [
+    {
+      "id": "session-uuid",
+      "ip": "192.168.1.1",
+      "userAgent": "Mozilla/5.0...",
+      "lastActivity": "2026-01-03T14:00:00.000Z",
+      "createdAt": "2026-01-03T13:38:36.595Z",
+      "expiresAt": "2026-01-04T13:38:36.595Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+### DELETE /auth/sessions/:sessionId
+Revoke a specific session.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Success Response (200):**
+```json
+{
+  "message": "Session revoked successfully."
+}
+```
+
+### POST /auth/session/refresh
+Refresh current session - extend expiration time.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Success Response (200):**
+```json
+{
+  "message": "Session refreshed successfully.",
+  "expiresAt": "2026-01-04T14:00:00.000Z"
+}
+```
+
+### POST /auth/session/rotate
+Rotate session token - get a new token for the current session.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Success Response (200):**
+```json
+{
+  "message": "Session token rotated successfully.",
+  "token": "new-session-token",
+  "expiresAt": "2026-01-04T14:00:00.000Z"
+}
+```
+
 ### POST /api/auth/forgot-password
 Request a password reset email.
 
@@ -194,6 +330,23 @@ Reset password using a valid token.
 | `DATABASE_URL` | PostgreSQL connection string |
 | `SESSION_SECRET` | Secret for session encryption (min 32 chars) |
 
+### Session Management
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SESSION_EXPIRY_MS` | Session lifetime in milliseconds | `86400000` (24h) |
+| `SESSION_TOKEN_TYPE` | Token type: `opaque` or `jwt` | `opaque` |
+| `MAX_CONCURRENT_SESSIONS` | Max sessions per user (0=unlimited) | `0` |
+| `SESSION_CLEANUP_INTERVAL_MS` | Cleanup interval in milliseconds | `3600000` (1h) |
+
+### JWT Configuration (if using JWT tokens)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `JWT_SECRET` | Secret for JWT signing | `SESSION_SECRET` |
+| `ACCESS_TOKEN_EXPIRY_MS` | Access token lifetime | `900000` (15min) |
+| `REFRESH_TOKEN_EXPIRY_MS` | Refresh token lifetime | `604800000` (7d) |
+
 ### Email (SMTP)
 
 | Variable | Description | Default |
@@ -243,11 +396,16 @@ Reset password using a valid token.
 ├── setup.sh            # Initial setup script
 ├── migrations/         # Database migrations
 │   ├── 001_auth_schema.sql
+│   ├── 003_enhanced_sessions.up.sql  # Session metadata columns
 │   └── ...
 ├── scripts/            # Utility scripts
 │   └── migrate.js      # Migration runner
 └── src/                # Application source
-    └── index.js        # Entry point
+    ├── index.js        # Entry point
+    ├── services/
+    │   ├── authService.js      # Authentication logic
+    │   └── sessionService.js   # Session management
+    └── ...
 ```
 
 ## Database Schema
@@ -255,19 +413,23 @@ Reset password using a valid token.
 The authentication system uses the following tables:
 
 - **users** - User accounts with email and password hash
-- **sessions** - Active user sessions
+- **sessions** - Active user sessions with metadata (IP, user agent, last activity)
 - **password_reset_tokens** - Password reset tokens
 - **email_verification_tokens** - Email verification tokens
 
 ## Security Considerations
 
 - Passwords hashed with bcrypt (configurable rounds)
-- Verification and reset tokens are 32 bytes of cryptographic randomness
-- Reset tokens are hashed with SHA-256 before storage
+- Session tokens are 64 bytes of cryptographic randomness
+- Tokens are hashed with SHA-256 before storage
 - Email verification tokens expire after 24 hours (configurable)
 - Password reset tokens expire after 1 hour
 - Reset tokens are single-use
 - All sessions invalidated on password reset
+- Session metadata tracked for security auditing
+- Concurrent session limits prevent session hijacking
+- Automatic session cleanup removes expired sessions
+- Token rotation available for sensitive operations
 - Email normalization (lowercase, trimmed)
 - Generic responses to prevent email enumeration
 - Use HTTPS in production

@@ -1,8 +1,8 @@
 import bcrypt from 'bcrypt';
 import { query } from '../db.js';
 import { config } from '../config.js';
-import { generateToken, getSessionExpiry, hashToken } from '../utils/token.js';
 import * as rateLimiter from '../utils/rateLimiter.js';
+import * as sessionService from './sessionService.js';
 
 /**
  * Validate login credentials and return user if valid
@@ -38,26 +38,16 @@ async function validateCredentials(email, password) {
 }
 
 /**
- * Create a new session for a user
+ * Create a new session for a user (with metadata support)
  */
-async function createSession(userId) {
-  const token = generateToken();
-  const hashedToken = hashToken(token);
-  const expiresAt = getSessionExpiry();
-
-  await query(
-    'INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3)',
-    [userId, hashedToken, expiresAt]
-  );
-
-  // Return unhashed token to client, hashed version stored in DB
-  return { token, expiresAt };
+async function createSession(userId, metadata = {}) {
+  return sessionService.createSimpleSession(userId, metadata);
 }
 
 /**
  * Login a user
  */
-export async function login(email, password, ip) {
+export async function login(email, password, ip, userAgent = null) {
   // Validate input
   if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
     return { success: false, error: 'invalid_input', message: 'Email and password are required.' };
@@ -102,8 +92,8 @@ export async function login(email, password, ip) {
   // Clear rate limiting on successful login
   rateLimiter.clearAttempts(email, ip);
 
-  // Create session
-  const session = await createSession(validation.user.id);
+  // Create session with metadata
+  const session = await createSession(validation.user.id, { ip, userAgent });
 
   return {
     success: true,
@@ -116,90 +106,44 @@ export async function login(email, password, ip) {
  * Logout - invalidate session by token
  */
 export async function logout(token) {
-  const hashedToken = hashToken(token);
-  const result = await query(
-    'DELETE FROM sessions WHERE token = $1 RETURNING id',
-    [hashedToken]
-  );
-
-  return { success: result.rowCount > 0 };
+  const result = await sessionService.revokeSessionByToken(token);
+  return result;
 }
 
 /**
  * Logout all sessions for a user
  */
-export async function logoutAll(userId) {
-  const result = await query(
-    'DELETE FROM sessions WHERE user_id = $1',
-    [userId]
-  );
-
-  return { success: true, count: result.rowCount };
+export async function logoutAll(userId, exceptSessionId = null) {
+  return sessionService.revokeAllSessions(userId, exceptSessionId);
 }
 
 /**
  * Validate a session token
  */
 export async function validateSession(token) {
-  const hashedToken = hashToken(token);
-  const result = await query(
-    `SELECT s.id, s.user_id, s.expires_at, u.email, u.role 
-     FROM sessions s 
-     JOIN users u ON s.user_id = u.id 
-     WHERE s.token = $1 AND s.expires_at > NOW()`,
-    [hashedToken]
-  );
-
-  if (result.rows.length === 0) {
-    return { valid: false };
+  const session = await sessionService.validateSession(token);
+  
+  // Add role from session service result or default to 'user'
+  if (session.valid && session.user) {
+    session.user.role = session.user.role || 'user';
   }
-
-  const session = result.rows[0];
-  return {
-    valid: true,
-    user: {
-      id: session.user_id,
-      email: session.email,
-      role: session.role || 'user',
-    },
-    expiresAt: session.expires_at,
-  };
-}
-
-/**
- * Refresh a session token - extends expiration
- */
-export async function refreshSession(token) {
-  const newToken = generateToken();
-  const hashedNewToken = hashToken(newToken);
-  const hashedOldToken = hashToken(token);
-  const newExpiresAt = getSessionExpiry();
-
-  const result = await query(
-    `UPDATE sessions 
-     SET token = $1, expires_at = $2 
-     WHERE token = $3 AND expires_at > NOW()
-     RETURNING id`,
-    [hashedNewToken, newExpiresAt, hashedOldToken]
-  );
-
-  if (result.rowCount === 0) {
-    return { success: false };
-  }
-
-  return {
-    success: true,
-    token: newToken,
-    expiresAt: newExpiresAt,
-  };
+  
+  return session;
 }
 
 /**
  * Clean up expired sessions
  */
 export async function cleanupExpiredSessions() {
-  const result = await query(
-    'DELETE FROM sessions WHERE expires_at < NOW()'
-  );
-  return { deleted: result.rowCount };
+  return sessionService.cleanupExpiredSessions();
 }
+
+// Re-export session functions for convenience
+export { 
+  getActiveSessions, 
+  revokeSession, 
+  refreshSession,
+  rotateSessionToken,
+  startSessionCleanup,
+  stopSessionCleanup,
+} from './sessionService.js';

@@ -8,6 +8,7 @@ import passwordResetRoutes from './routes/passwordReset.js';
 import protectedRoutes from './routes/protected.js';
 import { cors } from './middleware/cors.js';
 import pool from './db.js';
+import { startSessionCleanup } from './services/sessionService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,6 +90,8 @@ let server;
 if (import.meta.url === `file://${process.argv[1]}`) {
   server = app.listen(config.port, () => {
     console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
+    // Start automatic session cleanup
+    startSessionCleanup();
   });
 }
 

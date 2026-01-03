@@ -30,6 +30,8 @@ export async function authenticate(req, res, next) {
 
     req.user = session.user;
     req.sessionToken = token;
+    req.sessionId = session.sessionId;
+    req.sessionMetadata = session.metadata;
 
     // Check if token needs refresh (within 1 hour of expiration)
     const expiresAt = new Date(session.expiresAt);
