@@ -435,6 +435,31 @@ The authentication system uses the following tables:
 - Use HTTPS in production
 - Rate limiting to prevent brute force attacks
 
+## Documentation
+
+For more detailed documentation, see:
+
+- [API Reference](./docs/API.md) - Complete API endpoints documentation
+- [Security Guide](./docs/SECURITY.md) - Security features and best practices
+- [Setup Guide](./docs/SETUP.md) - Detailed installation and configuration
+
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run specific test file
+node --test src/utils/validation.test.js
+```
+
+Test coverage includes:
+- Unit tests for validation, token, and rate limiter utilities
+- Unit tests for auth middleware logic
+- Integration tests for auth flows
+- Tests for session management
+- Tests for password reset flows
+
 ## License
 
 MIT
