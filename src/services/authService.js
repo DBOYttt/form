@@ -133,7 +133,7 @@ export async function logoutAll(userId) {
  */
 export async function validateSession(token) {
   const result = await query(
-    `SELECT s.id, s.user_id, s.expires_at, u.email 
+    `SELECT s.id, s.user_id, s.expires_at, u.email, u.role 
      FROM sessions s 
      JOIN users u ON s.user_id = u.id 
      WHERE s.token = $1 AND s.expires_at > NOW()`,
@@ -150,8 +150,35 @@ export async function validateSession(token) {
     user: {
       id: session.user_id,
       email: session.email,
+      role: session.role || 'user',
     },
     expiresAt: session.expires_at,
+  };
+}
+
+/**
+ * Refresh a session token - extends expiration
+ */
+export async function refreshSession(token) {
+  const newToken = generateToken();
+  const newExpiresAt = getSessionExpiry();
+
+  const result = await query(
+    `UPDATE sessions 
+     SET token = $1, expires_at = $2 
+     WHERE token = $3 AND expires_at > NOW()
+     RETURNING id`,
+    [newToken, newExpiresAt, token]
+  );
+
+  if (result.rowCount === 0) {
+    return { success: false };
+  }
+
+  return {
+    success: true,
+    token: newToken,
+    expiresAt: newExpiresAt,
   };
 }
 

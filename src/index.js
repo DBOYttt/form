@@ -4,11 +4,16 @@ import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import authRoutes from './auth/routes.js';
 import passwordResetRoutes from './routes/passwordReset.js';
+import protectedRoutes from './routes/protected.js';
+import { cors } from './middleware/cors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// CORS middleware - must be before other middleware
+app.use(cors());
 
 // Middleware
 app.use(express.json());
@@ -35,6 +40,9 @@ app.use('/auth', authRoutes);
 
 // Password reset API routes
 app.use('/api/auth', passwordResetRoutes);
+
+// Protected API routes (profile, settings, admin)
+app.use('/api', protectedRoutes);
 
 // Serve HTML pages for password reset
 app.get('/forgot-password', (req, res) => {
