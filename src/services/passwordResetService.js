@@ -3,7 +3,7 @@ import { query, getClient } from '../db.js';
 import { config } from '../config.js';
 import { generateToken, hashToken } from '../utils/token.js';
 import { sendPasswordResetEmail } from '../email/mailer.js';
-import { validatePassword } from '../utils/validation.js';
+import { validatePassword, validatePasswordMatch } from '../utils/validation.js';
 
 class PasswordResetService {
   /**
@@ -121,20 +121,21 @@ class PasswordResetService {
    */
   async resetPassword(token, newPassword, confirmPassword) {
     // Validate passwords match
-    if (newPassword !== confirmPassword) {
-      return { success: false, message: 'Passwords do not match' };
+    const matchValidation = validatePasswordMatch(newPassword, confirmPassword);
+    if (!matchValidation.valid) {
+      return { success: false, error: 'validation_error', message: matchValidation.error };
     }
 
-    // Validate password strength
-    const passwordValidation = this.validatePasswordStrength(newPassword);
+    // Validate password strength using shared validation
+    const passwordValidation = validatePassword(newPassword);
     if (!passwordValidation.valid) {
-      return { success: false, message: passwordValidation.message };
+      return { success: false, error: 'validation_error', message: passwordValidation.error };
     }
 
     // Validate token
     const tokenValidation = await this.validateResetToken(token);
     if (!tokenValidation.valid) {
-      return { success: false, message: tokenValidation.error };
+      return { success: false, error: 'invalid_token', message: tokenValidation.error };
     }
 
     const client = await getClient();
@@ -178,16 +179,6 @@ class PasswordResetService {
     } finally {
       client.release();
     }
-  }
-
-  /**
-   * Validate password strength - delegates to shared validation
-   * @param {string} password - Password to validate
-   * @returns {{valid: boolean, message?: string}}
-   */
-  validatePasswordStrength(password) {
-    const result = validatePassword(password);
-    return { valid: result.valid, message: result.error };
   }
 
   /**

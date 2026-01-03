@@ -39,6 +39,7 @@ export const config = {
     tokenType: process.env.SESSION_TOKEN_TYPE || 'opaque', // 'jwt' or 'opaque'
     maxConcurrent: parseInt(process.env.MAX_CONCURRENT_SESSIONS || '0', 10), // 0 = unlimited
     cleanupIntervalMs: parseInt(process.env.SESSION_CLEANUP_INTERVAL_MS || '3600000', 10), // 1 hour
+    refreshThresholdMs: parseInt(process.env.SESSION_REFRESH_THRESHOLD_MS || '3600000', 10), // 1 hour before expiry
   },
 
   // JWT settings (if using JWT tokens)

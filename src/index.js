@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import authRoutes from './auth/routes.js';
 import passwordResetRoutes from './routes/passwordReset.js';
@@ -9,6 +8,7 @@ import protectedRoutes from './routes/protected.js';
 import { cors } from './middleware/cors.js';
 import pool from './db.js';
 import { startSessionCleanup } from './services/sessionService.js';
+import passwordResetService from './services/passwordResetService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,15 +24,6 @@ app.use(cors());
 // Body parsing with size limits
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-
-// Rate limiting
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requests per window for auth endpoints
-  message: { success: false, error: 'Too many requests, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 // Trust proxy for accurate IP detection (for rate limiting)
 app.set('trust proxy', 1);
@@ -50,8 +41,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth routes (rate limited)
-app.use('/auth', authLimiter, authRoutes);
+// Auth routes (rate limiting handled by individual route middleware)
+app.use('/auth', authRoutes);
 
 // Password reset API routes
 app.use('/api/auth', passwordResetRoutes);
@@ -90,8 +81,22 @@ let server;
 if (import.meta.url === `file://${process.argv[1]}`) {
   server = app.listen(config.port, () => {
     console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
-    // Start automatic session cleanup
+    
+    // Start automatic session cleanup (uses sessionService)
     startSessionCleanup();
+    
+    // Schedule periodic cleanup of expired password reset tokens
+    const TOKEN_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+    setInterval(async () => {
+      try {
+        const tokensDeleted = await passwordResetService.cleanupExpiredTokens();
+        if (config.nodeEnv === 'development') {
+          console.log(`Token cleanup: ${tokensDeleted} expired tokens removed`);
+        }
+      } catch (error) {
+        console.error('Token cleanup error:', error);
+      }
+    }, TOKEN_CLEANUP_INTERVAL);
   });
 }
 

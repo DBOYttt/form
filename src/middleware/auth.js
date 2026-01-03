@@ -33,9 +33,9 @@ export async function authenticate(req, res, next) {
     req.sessionId = session.sessionId;
     req.sessionMetadata = session.metadata;
 
-    // Check if token needs refresh (within 1 hour of expiration)
+    // Check if token needs refresh (within threshold of expiration)
     const expiresAt = new Date(session.expiresAt);
-    const refreshThreshold = 60 * 60 * 1000; // 1 hour
+    const refreshThreshold = config.session.refreshThresholdMs;
     if (expiresAt.getTime() - Date.now() < refreshThreshold) {
       try {
         const newSession = await authService.refreshSession(token);

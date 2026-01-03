@@ -1,7 +1,7 @@
 import express from 'express';
 import passwordResetService from '../services/passwordResetService.js';
 import { validateEmail } from '../utils/validation.js';
-import * as rateLimiter from '../utils/rateLimiter.js';
+import { strictRateLimit } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -9,13 +9,14 @@ const router = express.Router();
  * POST /api/auth/forgot-password
  * Request a password reset email
  */
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', strictRateLimit(), async (req, res) => {
   try {
     const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({
         success: false,
+        error: 'validation_error',
         message: 'Email is required',
       });
     }
@@ -25,17 +26,8 @@ router.post('/forgot-password', async (req, res) => {
     if (!emailValidation.valid) {
       return res.status(400).json({
         success: false,
+        error: 'validation_error',
         message: emailValidation.error,
-      });
-    }
-
-    // Rate limit by IP to prevent abuse
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const rateCheck = rateLimiter.isLoginAllowed(email, ip);
-    if (!rateCheck.allowed) {
-      return res.status(429).json({
-        success: false,
-        message: 'Too many password reset requests. Please try again later.',
       });
     }
 
@@ -91,7 +83,7 @@ router.get('/reset-password/validate', async (req, res) => {
  * POST /api/auth/reset-password
  * Reset password using token
  */
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', strictRateLimit(), async (req, res) => {
   try {
     const { token, newPassword, confirmPassword } = req.body;
 

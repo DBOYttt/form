@@ -3,6 +3,7 @@ import { registerUser, verifyEmail, resendVerificationEmail } from './registrati
 import * as authService from '../services/authService.js';
 import { authenticate } from '../middleware/auth.js';
 import { validateEmail } from '../utils/validation.js';
+import { authRateLimit, strictRateLimit } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ const router = express.Router();
  * POST /auth/register
  * Register a new user account
  */
-router.post('/register', async (req, res) => {
+router.post('/register', strictRateLimit(), async (req, res) => {
   try {
     const { email, password, confirmPassword } = req.body;
     
@@ -78,7 +79,7 @@ router.get('/verify-email', async (req, res) => {
  * POST /auth/resend-verification
  * Resend verification email
  */
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', strictRateLimit(), async (req, res) => {
   try {
     const { email } = req.body;
     
@@ -115,7 +116,7 @@ router.post('/resend-verification', async (req, res) => {
  * POST /auth/login
  * Login with email and password
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimit(), async (req, res) => {
   try {
     const { email, password } = req.body;
 

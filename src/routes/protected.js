@@ -4,8 +4,7 @@
  */
 
 import express from 'express';
-import { authenticate, requireRole, protect } from '../middleware/auth.js';
-import * as authService from '../services/authService.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 import { query } from '../db.js';
 import bcrypt from 'bcrypt';
 import { config } from '../config.js';
