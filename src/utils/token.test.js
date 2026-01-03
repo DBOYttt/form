@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { generateToken, getSessionExpiry } from './token.js';
+import { generateToken, getSessionExpiry, hashToken } from './token.js';
 
 describe('Token Utils', () => {
   describe('generateToken', () => {
@@ -43,6 +43,26 @@ describe('Token Utils', () => {
       
       // Allow 1 second tolerance
       assert.ok(Math.abs(diffMs - expectedMs) < 1000);
+    });
+  });
+
+  describe('hashToken', () => {
+    it('should hash token consistently', () => {
+      const token = 'test-token';
+      const hash1 = hashToken(token);
+      const hash2 = hashToken(token);
+      assert.strictEqual(hash1, hash2);
+    });
+
+    it('should produce different hashes for different tokens', () => {
+      const hash1 = hashToken('token1');
+      const hash2 = hashToken('token2');
+      assert.notStrictEqual(hash1, hash2);
+    });
+
+    it('should produce 64-character SHA-256 hash', () => {
+      const hash = hashToken('test');
+      assert.strictEqual(hash.length, 64);
     });
   });
 });

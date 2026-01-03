@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { config } from '../config.js';
 
 /**
@@ -27,4 +27,13 @@ export function getTokenExpiration(hours = 24) {
  */
 export function getSessionExpiry() {
   return new Date(Date.now() + config.session.expiresInMs);
+}
+
+/**
+ * Hash a token for secure storage (prevents timing attacks on database lookups)
+ * @param {string} token - Plain token
+ * @returns {string} SHA-256 hash of the token
+ */
+export function hashToken(token) {
+  return createHash('sha256').update(token).digest('hex');
 }

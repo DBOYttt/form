@@ -1,6 +1,12 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import authRoutes from './auth/routes.js';
+import passwordResetRoutes from './routes/passwordReset.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -26,6 +32,18 @@ app.get('/health', (req, res) => {
 
 // Auth routes (registration, email verification, login, logout)
 app.use('/auth', authRoutes);
+
+// Password reset API routes
+app.use('/api/auth', passwordResetRoutes);
+
+// Serve HTML pages for password reset
+app.get('/forgot-password', (req, res) => {
+  res.sendFile(path.join(__dirname, 'templates', 'forgot-password.html'));
+});
+
+app.get('/reset-password', (req, res) => {
+  res.sendFile(path.join(__dirname, 'templates', 'reset-password.html'));
+});
 
 // 404 handler
 app.use((req, res) => {

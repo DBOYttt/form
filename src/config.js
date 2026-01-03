@@ -44,4 +44,11 @@ export const config = {
     windowMs: 15 * 60 * 1000, // 15 minutes
     lockoutDurationMs: 30 * 60 * 1000, // 30 minutes lockout
   },
+  
+  // Password reset settings
+  passwordReset: {
+    tokenExpirationHours: 1,
+    tokenLength: 32,
+    invalidateSessionsOnPasswordReset: true,
+  },
 };

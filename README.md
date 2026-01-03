@@ -1,9 +1,10 @@
-# User Registration with Email Verification
+# Authentication Service
 
-A Node.js authentication service implementing secure user registration with email verification.
+A Node.js authentication service implementing secure user registration with email verification and password reset.
 
 ## Features
 
+### User Registration
 - User registration with email, password, and confirm password
 - Email format validation
 - Password strength requirements (8+ chars, uppercase, lowercase, number)
@@ -12,6 +13,15 @@ A Node.js authentication service implementing secure user registration with emai
 - Cryptographically secure verification tokens
 - Email verification flow with expiring tokens
 - Resend verification email functionality
+
+### Password Reset
+- Forgot password form with email input
+- Secure token generation with SHA-256 hashing
+- Configurable token expiration (default 1 hour)
+- Password reset form with confirmation
+- Token validation (exists, not expired, not used)
+- Session invalidation on password reset
+- Email enumeration protection
 
 ## API Endpoints
 
@@ -39,14 +49,6 @@ Register a new user account.
 }
 ```
 
-**Error Response (400):**
-```json
-{
-  "success": false,
-  "errors": ["Password must be at least 8 characters"]
-}
-```
-
 ### GET /auth/verify-email?token={token}
 Verify email address with the token sent via email.
 
@@ -68,6 +70,63 @@ Resend verification email.
 }
 ```
 
+### POST /api/auth/forgot-password
+Request a password reset email.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "If an account with that email exists, a password reset link has been sent."
+}
+```
+
+### GET /api/auth/reset-password/validate
+Validate a reset token before showing the reset form.
+
+**Query Parameters:**
+- `token`: The reset token from the email link
+
+**Response (valid):**
+```json
+{
+  "valid": true,
+  "email": "user@example.com"
+}
+```
+
+### POST /api/auth/reset-password
+Reset password using a valid token.
+
+**Request Body:**
+```json
+{
+  "token": "reset-token-from-email",
+  "newPassword": "NewSecureP@ss123",
+  "confirmPassword": "NewSecureP@ss123"
+}
+```
+
+**Response (success):**
+```json
+{
+  "success": true,
+  "message": "Password has been reset successfully. Please log in with your new password."
+}
+```
+
+## HTML Pages
+
+- `/forgot-password` - Forgot password form
+- `/reset-password?token=xxx` - Reset password form
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -87,7 +146,7 @@ Resend verification email.
 | EMAIL_FROM | noreply@example.com | Sender email |
 | BASE_URL | http://localhost:3000 | Application base URL |
 | BCRYPT_ROUNDS | 12 | Password hashing cost |
-| VERIFICATION_TOKEN_EXPIRY_HOURS | 24 | Token expiry time |
+| VERIFICATION_TOKEN_EXPIRY_HOURS | 24 | Email verification token expiry |
 
 ## Setup
 
@@ -119,8 +178,11 @@ npm test
 ## Security Considerations
 
 - Passwords hashed with bcrypt (configurable rounds)
-- Verification tokens are 32 bytes of cryptographic randomness
-- Tokens expire after 24 hours (configurable)
+- Verification and reset tokens are 32 bytes of cryptographic randomness
+- Reset tokens are hashed with SHA-256 before storage
+- Email verification tokens expire after 24 hours (configurable)
+- Password reset tokens expire after 1 hour
+- Reset tokens are single-use
+- All sessions invalidated on password reset
 - Email normalization (lowercase, trimmed)
-- Constant-time comparison not exposed via timing attacks
-- Generic responses to prevent email enumeration on resend
+- Generic responses to prevent email enumeration

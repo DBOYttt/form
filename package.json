@@ -1,7 +1,7 @@
 {
   "name": "auth-service",
   "version": "1.0.0",
-  "description": "User authentication service with email verification and login/logout",
+  "description": "User authentication service with email verification, login/logout and password reset",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
