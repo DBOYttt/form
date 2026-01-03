@@ -3,7 +3,18 @@ import { config } from './config.js';
 
 const { Pool } = pg;
 
-const pool = new Pool(config.database);
+const pool = new Pool({
+  ...config.database,
+  max: 20,                        // Maximum connections in pool
+  idleTimeoutMillis: 30000,       // Close idle connections after 30 seconds
+  connectionTimeoutMillis: 5000,  // Fail connection after 5 seconds
+  statement_timeout: 30000,       // Timeout queries after 30 seconds
+});
+
+// Handle pool errors
+pool.on('error', (err) => {
+  console.error('Unexpected database pool error:', err.message);
+});
 
 // Handle pool errors to prevent crashes
 pool.on('error', (err) => {

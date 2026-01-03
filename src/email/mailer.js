@@ -69,9 +69,68 @@ export async function sendVerificationEmail(to, token) {
   
   try {
     await getTransporter().sendMail(mailOptions);
-    console.log(`Verification email sent to ${to}`);
+    if (config.nodeEnv === 'development') {
+      console.log(`Verification email sent to ${to}`);
+    }
   } catch (error) {
-    console.error('Failed to send verification email:', error);
+    console.error('Failed to send verification email:', error.message);
     throw new Error('Failed to send verification email');
+  }
+}
+
+/**
+ * Send password reset email
+ * @param {string} to - Recipient email address
+ * @param {string} resetToken - Plain reset token (unhashed)
+ * @returns {Promise<void>}
+ */
+export async function sendPasswordResetEmail(to, resetToken) {
+  const resetUrl = `${config.baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+  
+  const mailOptions = {
+    from: config.email.from,
+    to,
+    subject: 'Password Reset Request',
+    text: `You requested a password reset. Click the following link to reset your password:\n\n${resetUrl}\n\nThis link will expire in ${config.passwordReset.tokenExpirationHours} hour(s).\n\nIf you did not request this reset, please ignore this email.`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Password Reset</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #2563eb;">Password Reset Request</h1>
+        <p>You requested a password reset. Click the button below to reset your password:</p>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${resetUrl}" 
+             style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            Reset Password
+          </a>
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          Or copy and paste this link into your browser:<br>
+          <a href="${resetUrl}" style="color: #2563eb;">${resetUrl}</a>
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          This link will expire in ${config.passwordReset.tokenExpirationHours} hour(s).
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px;">
+          If you did not request this reset, please ignore this email.
+        </p>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    await getTransporter().sendMail(mailOptions);
+    if (config.nodeEnv === 'development') {
+      console.log(`Password reset email sent to ${to}`);
+    }
+  } catch (error) {
+    console.error('Failed to send password reset email:', error.message);
+    throw new Error('Failed to send password reset email');
   }
 }

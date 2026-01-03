@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { query } from '../db.js';
 import { config } from '../config.js';
-import { generateToken, getSessionExpiry } from '../utils/token.js';
+import { generateToken, getSessionExpiry, hashToken } from '../utils/token.js';
 import * as rateLimiter from '../utils/rateLimiter.js';
 
 /**
@@ -42,13 +42,15 @@ async function validateCredentials(email, password) {
  */
 async function createSession(userId) {
   const token = generateToken();
+  const hashedToken = hashToken(token);
   const expiresAt = getSessionExpiry();
 
   await query(
     'INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3)',
-    [userId, token, expiresAt]
+    [userId, hashedToken, expiresAt]
   );
 
+  // Return unhashed token to client, hashed version stored in DB
   return { token, expiresAt };
 }
 
@@ -114,9 +116,10 @@ export async function login(email, password, ip) {
  * Logout - invalidate session by token
  */
 export async function logout(token) {
+  const hashedToken = hashToken(token);
   const result = await query(
     'DELETE FROM sessions WHERE token = $1 RETURNING id',
-    [token]
+    [hashedToken]
   );
 
   return { success: result.rowCount > 0 };
@@ -138,12 +141,13 @@ export async function logoutAll(userId) {
  * Validate a session token
  */
 export async function validateSession(token) {
+  const hashedToken = hashToken(token);
   const result = await query(
     `SELECT s.id, s.user_id, s.expires_at, u.email, u.role 
      FROM sessions s 
      JOIN users u ON s.user_id = u.id 
      WHERE s.token = $1 AND s.expires_at > NOW()`,
-    [token]
+    [hashedToken]
   );
 
   if (result.rows.length === 0) {
@@ -167,6 +171,8 @@ export async function validateSession(token) {
  */
 export async function refreshSession(token) {
   const newToken = generateToken();
+  const hashedNewToken = hashToken(newToken);
+  const hashedOldToken = hashToken(token);
   const newExpiresAt = getSessionExpiry();
 
   const result = await query(
@@ -174,7 +180,7 @@ export async function refreshSession(token) {
      SET token = $1, expires_at = $2 
      WHERE token = $3 AND expires_at > NOW()
      RETURNING id`,
-    [newToken, newExpiresAt, token]
+    [hashedNewToken, newExpiresAt, hashedOldToken]
   );
 
   if (result.rowCount === 0) {

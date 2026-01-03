@@ -14,10 +14,13 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Security middleware
+app.disable('x-powered-by');
+
 // CORS middleware - must be before other middleware
 app.use(cors());
 
-// Middleware
+// Body parsing with size limits
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 

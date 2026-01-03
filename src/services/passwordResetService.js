@@ -1,8 +1,9 @@
 import bcrypt from 'bcrypt';
-import pool, { query, getClient } from '../db.js';
+import { query, getClient } from '../db.js';
 import { config } from '../config.js';
 import { generateToken, hashToken } from '../utils/token.js';
-import { sendPasswordResetEmail } from './emailService.js';
+import { sendPasswordResetEmail } from '../email/mailer.js';
+import { validatePassword } from '../utils/validation.js';
 
 class PasswordResetService {
   /**
@@ -180,32 +181,13 @@ class PasswordResetService {
   }
 
   /**
-   * Validate password strength
+   * Validate password strength - delegates to shared validation
    * @param {string} password - Password to validate
    * @returns {{valid: boolean, message?: string}}
    */
   validatePasswordStrength(password) {
-    if (!password || password.length < 8) {
-      return { valid: false, message: 'Password must be at least 8 characters long' };
-    }
-
-    if (password.length > 128) {
-      return { valid: false, message: 'Password must not exceed 128 characters' };
-    }
-
-    // Check for at least one uppercase, one lowercase, one number
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasLowercase = /[a-z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-
-    if (!hasUppercase || !hasLowercase || !hasNumber) {
-      return {
-        valid: false,
-        message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
-      };
-    }
-
-    return { valid: true };
+    const result = validatePassword(password);
+    return { valid: result.valid, message: result.error };
   }
 
   /**

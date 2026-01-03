@@ -1,5 +1,7 @@
 import express from 'express';
 import passwordResetService from '../services/passwordResetService.js';
+import { validateEmail } from '../utils/validation.js';
+import * as rateLimiter from '../utils/rateLimiter.js';
 
 const router = express.Router();
 
@@ -18,10 +20,29 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
+    // Validate email format before any processing
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: emailValidation.error,
+      });
+    }
+
+    // Rate limit by IP to prevent abuse
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const rateCheck = rateLimiter.isLoginAllowed(email, ip);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many password reset requests. Please try again later.',
+      });
+    }
+
     const result = await passwordResetService.requestPasswordReset(email);
     return res.json(result);
   } catch (error) {
-    console.error('Forgot password error:', error);
+    console.error('Forgot password error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'An error occurred while processing your request',
@@ -58,7 +79,7 @@ router.get('/reset-password/validate', async (req, res) => {
       email: result.email,
     });
   } catch (error) {
-    console.error('Token validation error:', error);
+    console.error('Token validation error:', error.message);
     return res.status(500).json({
       valid: false,
       error: 'An error occurred while validating the token',
@@ -96,7 +117,7 @@ router.post('/reset-password', async (req, res) => {
 
     return res.json(result);
   } catch (error) {
-    console.error('Reset password error:', error);
+    console.error('Reset password error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'An error occurred while resetting your password',
