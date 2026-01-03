@@ -33,7 +33,10 @@ export async function registerUser({ email, password, confirmPassword }) {
   // Hash password
   const passwordHash = await bcrypt.hash(password, config.bcryptRounds);
   
-  // Generate verification token
+  // In dev mode with skip email verification, auto-verify users
+  const autoVerify = config.devMode?.skipEmailVerification;
+  
+  // Generate verification token (still generate even if auto-verifying for logging)
   const verificationToken = generateToken();
   const tokenExpiration = getTokenExpiration(config.verificationTokenExpiry);
   
@@ -43,40 +46,52 @@ export async function registerUser({ email, password, confirmPassword }) {
   try {
     await client.query('BEGIN');
     
-    // Create user
+    // Create user (auto-verified in dev mode)
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, email_verified)
-       VALUES ($1, $2, false)
+       VALUES ($1, $2, $3)
        RETURNING id, email, email_verified, created_at`,
-      [normalizedEmail, passwordHash],
+      [normalizedEmail, passwordHash, autoVerify],
     );
     
     const user = userResult.rows[0];
     
-    // Create verification token
-    await client.query(
-      `INSERT INTO email_verification_tokens (user_id, token, expires_at)
-       VALUES ($1, $2, $3)`,
-      [user.id, verificationToken, tokenExpiration],
-    );
+    // Create verification token (unless auto-verified)
+    if (!autoVerify) {
+      await client.query(
+        `INSERT INTO email_verification_tokens (user_id, token, expires_at)
+         VALUES ($1, $2, $3)`,
+        [user.id, verificationToken, tokenExpiration],
+      );
+    }
     
     await client.query('COMMIT');
     
-    // Send verification email (don't fail registration if email fails)
-    try {
-      await sendVerificationEmail(normalizedEmail, verificationToken);
-    } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
-      // User is still created, they can request a new verification email later
+    // Handle email sending / logging
+    if (autoVerify) {
+      console.log(`\x1b[33m⚠️  DEV MODE: User ${normalizedEmail} auto-verified (SKIP_EMAIL_VERIFICATION=true)\x1b[0m`);
+    } else {
+      // Send verification email (don't fail registration if email fails)
+      try {
+        await sendVerificationEmail(normalizedEmail, verificationToken);
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+        // User is still created, they can request a new verification email later
+      }
     }
+    
+    const message = autoVerify
+      ? 'Registration successful. Your account is ready to use (dev mode - email verification skipped).'
+      : 'Registration successful. Please check your email to verify your account.';
     
     return {
       success: true,
       user: {
         id: user.id,
         email: user.email,
+        emailVerified: autoVerify,
       },
-      message: 'Registration successful. Please check your email to verify your account.',
+      message,
     };
   } catch (error) {
     await client.query('ROLLBACK');

@@ -2,8 +2,10 @@
  * Email and password validation utilities
  */
 
+import { config } from '../config.js';
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
+const MIN_PASSWORD_LENGTH = config.minPasswordLength || 8;
 
 /**
  * Validates email format
@@ -34,6 +36,7 @@ export function validateEmail(email) {
 
 /**
  * Validates password strength
+ * In dev mode, only minimum length is required
  * @param {string} password 
  * @returns {{ valid: boolean, error?: string }}
  */
@@ -48,6 +51,11 @@ export function validatePassword(password) {
   
   if (password.length > 128) {
     return { valid: false, error: 'Password must be 128 characters or less' };
+  }
+  
+  // In dev mode with relaxed security, skip complexity requirements
+  if (config.devMode?.relaxedSecurity) {
+    return { valid: true };
   }
   
   // Check for at least one uppercase, one lowercase, and one number

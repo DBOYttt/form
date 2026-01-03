@@ -7,6 +7,11 @@ import { config } from '../config.js';
 
 // Default allowed origins (can be overridden via environment)
 const getAllowedOrigins = () => {
+  // In dev mode with relaxed security, allow all origins
+  if (config.devMode?.relaxedSecurity) {
+    return ['*'];
+  }
+  
   const envOrigins = process.env.CORS_ALLOWED_ORIGINS;
   if (envOrigins) {
     return envOrigins.split(',').map(origin => origin.trim());

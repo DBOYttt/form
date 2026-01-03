@@ -41,9 +41,50 @@ A Node.js authentication service implementing secure user registration with emai
 
 - Node.js 18 or higher
 - PostgreSQL database
-- SMTP server (for email features)
+- SMTP server (for email features - not needed in dev mode)
 
-### Installation
+### Development Mode (Quickstart)
+
+Get started immediately with zero configuration:
+
+```bash
+# Clone and install
+git clone <repository>
+cd auth-service
+npm install
+
+# Start in dev mode (uses .env.development automatically)
+npm run dev
+# Or use the dev script with more options
+./dev.sh
+```
+
+Dev mode automatically:
+- Bypasses email verification (users auto-verified on registration)
+- Logs emails to console instead of sending
+- Allows weak passwords (min 4 chars)
+- Disables rate limiting
+- Enables verbose error messages with stack traces
+- Allows all CORS origins
+
+#### Dev Script Options
+
+```bash
+./dev.sh                  # Start dev server
+./dev.sh --reset-db       # Wipe and recreate database
+./dev.sh --seed           # Seed with test users
+./dev.sh --port 8080      # Use custom port
+npm run dev:reset         # Reset DB and seed test users
+```
+
+#### Test Users (after seeding)
+
+| Email | Password | Status |
+|-------|----------|--------|
+| test@example.com | password123 | Verified |
+| unverified@example.com | password123 | Unverified |
+
+### Installation (Production)
 
 1. **Clone and setup:**
    ```bash
@@ -314,6 +355,9 @@ Reset password using a valid token.
 |---------|-------------|
 | `npm start` | Start the production server |
 | `npm run dev` | Start development server with auto-reload |
+| `npm run dev:full` | Start dev server using dev.sh script |
+| `npm run dev:reset` | Reset database and seed test users |
+| `npm run seed:dev` | Seed database with test users |
 | `npm run setup` | Install dependencies and run migrations |
 | `npm run migrate` | Run pending database migrations |
 | `npm run migrate:down` | Rollback last migration |
@@ -322,6 +366,20 @@ Reset password using a valid token.
 | `npm run lint` | Run ESLint |
 
 ## Environment Variables
+
+### Development Mode Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEV_MODE` | Enable all development features | `false` |
+| `SKIP_EMAIL_VERIFICATION` | Auto-verify users on registration | `false` |
+| `MOCK_EMAIL` | Log emails to console instead of sending | `false` |
+| `DISABLE_RATE_LIMIT` | Disable rate limiting | `false` |
+| `SAVE_DEV_EMAILS` | Save mock emails to files | `false` |
+| `DEV_EMAILS_DIR` | Directory for saved mock emails | `./dev-emails` |
+| `HOST` | Server host address | `0.0.0.0` |
+
+> ⚠️ **Warning**: These settings should NEVER be enabled in production!
 
 ### Required
 

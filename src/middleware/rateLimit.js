@@ -39,6 +39,11 @@ export function rateLimit({
   message = 'Too many requests. Please try again later.',
 } = {}) {
   return (req, res, next) => {
+    // Skip rate limiting in dev mode if disabled
+    if (config.rateLimit?.disabled) {
+      return next();
+    }
+    
     const key = keyGenerator(req);
     const now = Date.now();
 

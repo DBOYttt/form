@@ -1,10 +1,28 @@
 /**
  * Application configuration
  */
+
+// Development mode flags
+const isDevMode = process.env.DEV_MODE === 'true' || process.env.NODE_ENV === 'development';
+const skipEmailVerification = process.env.SKIP_EMAIL_VERIFICATION === 'true';
+const mockEmail = process.env.MOCK_EMAIL === 'true';
+
 export const config = {
   // Server
   port: process.env.PORT || 3000,
+  host: process.env.HOST || '0.0.0.0',
   nodeEnv: process.env.NODE_ENV || 'development',
+  
+  // Development mode settings
+  devMode: {
+    enabled: isDevMode,
+    skipEmailVerification: skipEmailVerification || isDevMode,
+    mockEmail: mockEmail || isDevMode,
+    relaxedSecurity: isDevMode,
+    verboseErrors: isDevMode,
+    saveEmailsToFile: process.env.SAVE_DEV_EMAILS === 'true',
+    devEmailsDir: process.env.DEV_EMAILS_DIR || './dev-emails',
+  },
   
   // Database
   database: {
@@ -29,7 +47,7 @@ export const config = {
   baseUrl: process.env.BASE_URL || 'http://localhost:3000',
   
   // Security
-  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
+  bcryptRounds: isDevMode ? 4 : parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
   verificationTokenExpiry: parseInt(process.env.VERIFICATION_TOKEN_EXPIRY_HOURS || '24', 10),
 
   // Session settings
@@ -54,6 +72,7 @@ export const config = {
     maxAttempts: 5,
     windowMs: 15 * 60 * 1000, // 15 minutes
     lockoutDurationMs: 30 * 60 * 1000, // 30 minutes lockout
+    disabled: isDevMode && process.env.DISABLE_RATE_LIMIT === 'true',
   },
   
   // Password reset settings
@@ -62,4 +81,7 @@ export const config = {
     tokenLength: 32,
     invalidateSessionsOnPasswordReset: true,
   },
+  
+  // Minimum password length (relaxed in dev mode)
+  minPasswordLength: isDevMode ? 4 : 8,
 };

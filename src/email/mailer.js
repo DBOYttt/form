@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config.js';
+import { mockSendMail, logVerificationToken, logPasswordResetToken } from './mockMailer.js';
 
 let transporter;
 
@@ -29,6 +30,21 @@ function getTransporter() {
  */
 export async function sendVerificationEmail(to, token) {
   const verificationLink = `${config.baseUrl}/auth/verify-email?token=${token}`;
+  
+  // In dev mode with mock email, log to console instead
+  if (config.devMode?.mockEmail) {
+    logVerificationToken(to, token, verificationLink);
+    
+    const mailOptions = {
+      from: config.email.from,
+      to,
+      subject: 'Verify your email address',
+      text: `Welcome! Please verify your email address by clicking the following link:\n\n${verificationLink}\n\nThis link will expire in ${config.verificationTokenExpiry} hours.\n\nIf you did not create an account, please ignore this email.`,
+    };
+    
+    await mockSendMail(mailOptions);
+    return;
+  }
   
   const mailOptions = {
     from: config.email.from,
@@ -86,6 +102,21 @@ export async function sendVerificationEmail(to, token) {
  */
 export async function sendPasswordResetEmail(to, resetToken) {
   const resetUrl = `${config.baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+  
+  // In dev mode with mock email, log to console instead
+  if (config.devMode?.mockEmail) {
+    logPasswordResetToken(to, resetToken, resetUrl);
+    
+    const mailOptions = {
+      from: config.email.from,
+      to,
+      subject: 'Password Reset Request',
+      text: `You requested a password reset. Click the following link to reset your password:\n\n${resetUrl}\n\nThis link will expire in ${config.passwordReset.tokenExpirationHours} hour(s).\n\nIf you did not request this reset, please ignore this email.`,
+    };
+    
+    await mockSendMail(mailOptions);
+    return;
+  }
   
   const mailOptions = {
     from: config.email.from,
